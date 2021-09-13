@@ -1633,7 +1633,7 @@ LoadBattleMonFromParty:
 	ld bc, wPartyMon1DVs - wPartyMon1OTID
 	add hl, bc
 	ld de, wBattleMonDVs
-	ld bc, NUM_DVS
+	ld bc, wPartyMon1PP - wPartyMon1DVs
 	call CopyData
 	ld de, wBattleMonPP
 	ld bc, NUM_MOVES
@@ -1677,7 +1677,7 @@ LoadEnemyMonFromParty:
 	ld bc, wEnemyMon1DVs - wEnemyMon1OTID
 	add hl, bc
 	ld de, wEnemyMonDVs
-	ld bc, NUM_DVS
+	ld bc, wEnemyMon1PP - wEnemyMon1DVs
 	call CopyData
 	ld de, wEnemyMonPP
 	ld bc, NUM_MOVES
@@ -2239,7 +2239,7 @@ UseBagItem:
 	ld a, [wcf91]
 	ld [wd11e], a
 	call GetItemName
-	call CopyStringToCF4B ; copy name
+	call CopyToStringBuffer
 	xor a
 	ld [wPseudoItemID], a
 	call UseItem
@@ -2472,13 +2472,13 @@ MoveSelectionMenu:
 
 .writemoves
 	ld de, wMovesString
-	ldh a, [hFlagsFFF6]
+	ldh a, [hUILayoutFlags]
 	set 2, a
-	ldh [hFlagsFFF6], a
+	ldh [hUILayoutFlags], a
 	call PlaceString
-	ldh a, [hFlagsFFF6]
+	ldh a, [hUILayoutFlags]
 	res 2, a
-	ldh [hFlagsFFF6], a
+	ldh [hUILayoutFlags], a
 	ret
 
 .regularmenu
@@ -2598,10 +2598,10 @@ SelectMenuItem:
 	call AddNTimes
 	ld [hl], "▷"
 .select
-	ld hl, hFlagsFFF6
+	ld hl, hUILayoutFlags
 	set 1, [hl]
 	call HandleMenuInput
-	ld hl, hFlagsFFF6
+	ld hl, hUILayoutFlags
 	res 1, [hl]
 	bit BIT_D_UP, a
 	jp nz, SelectMenuItem_CursorUp
@@ -3544,7 +3544,7 @@ CheckPlayerStatusConditions:
 	ld a, RAGE
 	ld [wd11e], a
 	call GetMoveName
-	call CopyStringToCF4B
+	call CopyToStringBuffer
 	xor a
 	ld [wPlayerMoveEffect], a
 	ld hl, PlayerCanExecuteMove
@@ -3746,7 +3746,7 @@ PrintMoveName:
 	ret
 
 _PrintMoveName:
-	text_far _CF4BText
+	text_far _MoveNameText
 	text_asm
 	ld hl, ExclamationPointPointerTable
 	ld a, [wd11e] ; exclamation point num
@@ -5101,14 +5101,14 @@ ReloadMoveData:
 	ld [wd11e], a
 	dec a
 	ld hl, Moves
-	ld bc, MoveEnd - Moves
+	ld bc, MOVE_LENGTH
 	call AddNTimes
 	ld a, BANK(Moves)
 	call FarCopyData ; copy the move's stats
 	call IncrementMovePP
 ; the follow two function calls are used to reload the move name
 	call GetMoveName
-	call CopyStringToCF4B
+	call CopyToStringBuffer
 	ld a, $01
 	and a
 	ret
@@ -5133,7 +5133,7 @@ MetronomePickMove:
 	call BattleRandom
 	and a
 	jr z, .pickMoveLoop
-	cp NUM_ATTACKS + 1 ; max normal move number + 1 (this is Struggle's move number)
+	cp NUM_ATTACKS ; max move number (including Struggle)
 	jr nc, .pickMoveLoop
 	cp METRONOME
 	jr z, .pickMoveLoop
@@ -5609,7 +5609,7 @@ EnemyCanExecuteChargingMove:
 	ld [wNameListType], a
 	call GetName
 	ld de, wcd6d
-	call CopyStringToCF4B
+	call CopyToStringBuffer
 EnemyCanExecuteMove:
 	xor a
 	ld [wMonIsDisobedient], a
@@ -6046,7 +6046,7 @@ CheckEnemyStatusConditions:
 	ld a, RAGE
 	ld [wd11e], a
 	call GetMoveName
-	call CopyStringToCF4B
+	call CopyToStringBuffer
 	xor a
 	ld [wEnemyMoveEffect], a
 	ld hl, EnemyCanExecuteMove
@@ -6077,7 +6077,7 @@ GetCurrentMove:
 	ld [wd0b5], a
 	dec a
 	ld hl, Moves
-	ld bc, MoveEnd - Moves
+	ld bc, MOVE_LENGTH
 	call AddNTimes
 	ld a, BANK(Moves)
 	call FarCopyData
@@ -6088,7 +6088,7 @@ GetCurrentMove:
 	ld [wNameListType], a
 	call GetName
 	ld de, wcd6d
-	jp CopyStringToCF4B
+	jp CopyToStringBuffer
 
 LoadEnemyMonData:
 	ld a, [wLinkState]
@@ -6308,6 +6308,7 @@ LoadPlayerBackPic:
 	ld de, OldManPicBack
 .next
 	ld a, BANK(RedPicBack)
+	ASSERT BANK(RedPicBack) == BANK(OldManPicBack)
 	call UncompressSpriteFromDE
 	predef ScaleSpriteByTwo
 	ld hl, wOAMBuffer
@@ -6880,7 +6881,7 @@ _LoadTrainerPic:
 	ld d, a ; de contains pointer to trainer pic
 	ld a, [wLinkState]
 	and a
-	ld a, BANK(TrainerPics) ; this is where all the trainer pics are (not counting Red's)
+	ld a, BANK("Pics 6") ; this is where all the trainer pics are (not counting Red's)
 	jr z, .loadSprite
 	ld a, BANK(RedPicFront)
 .loadSprite
@@ -6899,9 +6900,9 @@ ResetCryModifiers:
 
 ; animates the mon "growing" out of the pokeball
 AnimateSendingOutMon:
-	ld a, [wPredefRegisters]
+	ld a, [wPredefHL]
 	ld h, a
-	ld a, [wPredefRegisters + 1]
+	ld a, [wPredefHL + 1]
 	ld l, a
 	ldh a, [hStartTileID]
 	ldh [hBaseTileID], a
@@ -6939,9 +6940,9 @@ AnimateSendingOutMon:
 	jr CopyUncompressedPicToHL
 
 CopyUncompressedPicToTilemap:
-	ld a, [wPredefRegisters]
+	ld a, [wPredefHL]
 	ld h, a
-	ld a, [wPredefRegisters + 1]
+	ld a, [wPredefHL + 1]
 	ld l, a
 	ldh a, [hStartTileID]
 CopyUncompressedPicToHL::

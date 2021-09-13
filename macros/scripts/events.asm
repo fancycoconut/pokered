@@ -184,8 +184,8 @@ ENDM
 SetEvents: MACRO
 	SetEvent \1
 	REPT _NARG - 1
-	SetEventReuseHL \2
-	SHIFT
+		SetEventReuseHL \2
+		SHIFT
 	ENDR
 ENDM
 
@@ -236,31 +236,9 @@ ENDM
 ResetEvents: MACRO
 	ResetEvent \1
 	REPT _NARG - 1
-	ResetEventReuseHL \2
-	SHIFT
+		ResetEventReuseHL \2
+		SHIFT
 	ENDR
-ENDM
-
-
-;\1 = event index
-;\2 = number of bytes away from the base address (optional, for matching the ROM)
-dbEventFlagBit: MACRO
-	IF _NARG > 1
-		db ((\1) % 8) + ((\2) * 8)
-	ELSE
-		db ((\1) % 8)
-	ENDC
-ENDM
-
-
-;\1 = event index
-;\2 = number of bytes away from the base address (optional, for matching the ROM)
-dwEventFlagAddress: MACRO
-	IF _NARG > 1
-		dw wEventFlags + ((\1) / 8) - (\2)
-	ELSE
-		dw wEventFlags + ((\1) / 8)
-	ENDC
 ENDM
 
 
@@ -468,4 +446,3 @@ AdjustEventBit: MACRO
 		add ((\1) % 8) - (\2)
 	ENDC
 ENDM
-

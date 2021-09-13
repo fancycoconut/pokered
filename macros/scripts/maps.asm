@@ -1,10 +1,7 @@
 def_objects: MACRO
-	IF DEF(_NUM_OBJECTS)
-		PURGE _NUM_OBJECTS
-	ENDC
-_NUM_OBJECTS EQUS "_NUM_OBJECTS_\@"
-	db _NUM_OBJECTS
-_NUM_OBJECTS = 0
+REDEF _NUM_OBJECTS EQUS "_NUM_OBJECTS_\@"
+	db {_NUM_OBJECTS}
+{_NUM_OBJECTS} = 0
 ENDM
 
 ;\1 sprite id
@@ -32,16 +29,13 @@ object: MACRO
 	ELSE
 		db \6
 	ENDC
-_NUM_OBJECTS = _NUM_OBJECTS + 1
+{_NUM_OBJECTS} = {_NUM_OBJECTS} + 1
 ENDM
 
 def_warps: MACRO
-	IF DEF(_NUM_WARPS)
-		PURGE _NUM_WARPS
-	ENDC
-_NUM_WARPS EQUS "_NUM_WARPS_\@"
-	db _NUM_WARPS
-_NUM_WARPS = 0
+REDEF _NUM_WARPS EQUS "_NUM_WARPS_\@"
+	db {_NUM_WARPS}
+{_NUM_WARPS} = 0
 ENDM
 
 ;\1 x position
@@ -50,20 +44,15 @@ ENDM
 ;\4 destination map (-1 = wLastMap)
 warp: MACRO
 	db \2, \1, \3, \4
-_NUM_WARPS = _NUM_WARPS + 1
-; the Nth warp defines a corresponding Nth warp_to, stored in _WARP_TO_NUM_<N>
-_WARP_TO_NAME EQUS "_WARP_TO_NUM_{d:{_NUM_WARPS}}"
-_WARP_TO_NAME EQUS "warp_to \1, \2, _WARP_TO_WIDTH"
-	PURGE _WARP_TO_NAME
+_WARP_{d:{_NUM_WARPS}}_X = \1
+_WARP_{d:{_NUM_WARPS}}_Y = \2
+{_NUM_WARPS} = {_NUM_WARPS} + 1
 ENDM
 
 def_signs: MACRO
-	IF DEF(_NUM_SIGNS)
-		PURGE _NUM_SIGNS
-	ENDC
-_NUM_SIGNS EQUS "_NUM_SIGNS_\@"
-	db _NUM_SIGNS
-_NUM_SIGNS = 0
+REDEF _NUM_SIGNS EQUS "_NUM_SIGNS_\@"
+	db {_NUM_SIGNS}
+{_NUM_SIGNS} = 0
 ENDM
 
 ;\1 x position
@@ -71,22 +60,13 @@ ENDM
 ;\3 sign id
 sign: MACRO
 	db \2, \1, \3
-_NUM_SIGNS = _NUM_SIGNS + 1
+{_NUM_SIGNS} = {_NUM_SIGNS} + 1
 ENDM
 
 ;\1 source map
 def_warps_to: MACRO
-; output and purge each _WARP_TO_NUM_<N> warp_to, from N=1 to _NUM_WARPS
-_WARP_TO_WIDTH = \1_WIDTH
-_WARP_TO_N = 1
-	REPT _NUM_WARPS
-_WARP_TO_NAME EQUS "_WARP_TO_NUM_{d:_WARP_TO_N}"
-		_WARP_TO_NAME
-_WARP_TO_N = _WARP_TO_N + 1
-_PURGE_WARP_TO_NUM EQUS "PURGE {_WARP_TO_NAME}"
-		_PURGE_WARP_TO_NUM
-		PURGE _PURGE_WARP_TO_NUM
-		PURGE _WARP_TO_NAME
+	FOR n, _NUM_WARPS
+		warp_to _WARP_{d:n}_X, _WARP_{d:n}_Y, \1_WIDTH
 	ENDR
 ENDM
 
@@ -98,23 +78,30 @@ warp_to: MACRO
 ENDM
 
 
+;\1 first bit offset / first object id
+def_trainers: MACRO
+IF _NARG == 1
+CURRENT_TRAINER_BIT = \1
+ELSE
+CURRENT_TRAINER_BIT = 1
+ENDC
+ENDM
+
 ;\1 event flag
 ;\2 view range
 ;\3 TextBeforeBattle
 ;\4 TextAfterBattle
 ;\5 TextEndBattle
 trainer: MACRO
-	IF _NARG > 5
-		dbEventFlagBit \1, \2
-		db (\3 << 4)
-		dwEventFlagAddress \1, \2
-		SHIFT
-	ELSE
-		dbEventFlagBit \1
-		db (\2 << 4)
-		dwEventFlagAddress \1
-	ENDC
+_ev_bit = \1 % 8
+_cur_bit = CURRENT_TRAINER_BIT % 8
+	ASSERT _ev_bit == _cur_bit, \
+		"Expected \1 to be bit {d:_cur_bit}, got {d:_ev_bit}"
+	db CURRENT_TRAINER_BIT
+	db \2 << 4
+	dw wEventFlags + (\1 - CURRENT_TRAINER_BIT) / 8
 	dw \3, \5, \4, \4
+CURRENT_TRAINER_BIT = CURRENT_TRAINER_BIT + 1
 ENDM
 
 ;\1 x position
@@ -145,10 +132,8 @@ ENDM
 
 ; Comes after map_header and connection macros
 end_map_header: MACRO
-	dw CURRENT_MAP_OBJECT
-	PURGE CURRENT_MAP_WIDTH
-	PURGE CURRENT_MAP_HEIGHT
-	PURGE CURRENT_MAP_OBJECT
+	dw {CURRENT_MAP_OBJECT}
+	PURGE CURRENT_MAP_WIDTH, CURRENT_MAP_HEIGHT, CURRENT_MAP_OBJECT
 ENDM
 
 ; Connections go in order: north, south, west, east
